@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, flash
+from flask import Flask, render_template, request, flash, session, jsonify, redirect
 from hashlib import md5
 import os
 
@@ -30,8 +30,20 @@ def cadastro():
 
     return render_template("cadastrar.html")
 
+@app.route("/teste_user", methods=['GET'])
+def teste_user():
+    retorno = {}
+    if 'logado' in session:
+        retorno['status'] = session.get('logado')
+        retorno['login'] = session.get('nome')
+    
+    return jsonify(retorno)
+
 @app.route("/", methods=['GET', 'POST'])
 def index():
+
+    session.pop('logado', None)
+    session.pop('nome', None)
 
     if request.method == 'POST':
         login = request.form.get('username')
@@ -52,7 +64,11 @@ def index():
                         login_ok = True
         
         if login_ok:
+            session['logado'] = True
+            session['nome'] = login
             flash("Login OK", 'success')
+
+            return redirect('/teste_user')
         else:
             flash("Login e/ou Senha incorreto(s)", 'warning')
 
