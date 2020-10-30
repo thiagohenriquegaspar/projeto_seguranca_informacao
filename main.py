@@ -1,9 +1,13 @@
 from flask import Flask, render_template, request, flash, session, jsonify, redirect
 from hashlib import md5
+from datetime import datetime
 import os
 
 app = Flask(__name__)
 app.secret_key = f"S3gur4n@c0"
+
+# Desativar seguranca = False || Ativar seguranca = True
+USAR_SEGURANCA_ADICIONAL = False
 
 @app.route("/cadastrar", methods=['GET', 'POST'])
 def cadastro():
@@ -66,11 +70,43 @@ def index():
         if login_ok:
             session['logado'] = True
             session['nome'] = login
+            
+            # Limpar bloqueio de excesso de tentativas
+            session['tentativas_erro'] = 0
+            if 'momento_bloqueado' in session:
+                session.pop('momento_bloqueado')
+            
             flash("Login OK", 'success')
 
             return redirect('/teste_user')
         else:
-            flash("Login e/ou Senha incorreto(s)", 'warning')
+            if not 'tentativas_erro' in session:
+                session['tentativas_erro'] = 0
+
+            if USAR_SEGURANCA_ADICIONAL:
+                if session['tentativas_erro'] == 3:
+                    if not 'momento_bloqueado' in session:
+                        session['momento_bloqueado'] = datetime.now()
+                    
+                    # Sessão Bloqueada
+                    if 'momento_bloqueado' in session:
+                        diff = (datetime.now() - session['momento_bloqueado']).total_seconds()
+                        diff = 240 - diff 
+
+                        if diff > 0:
+                            flash(f"Aguarde {'%02d' %  int(diff// 3600)}:{'%02d' % int(diff// 60)}:{'%02d' %  int(diff % 60)} para fazer o login", 'danger')
+                        # Liberar após 4 minutos
+                        else:
+                            session['tentativas_erro'] = 3
+                            session.pop('momento_bloqueado')
+
+                # Aumentar tentativa de erro
+                else:
+                    session['tentativas_erro'] += 1
+                    
+                    flash(f"Login e/ou Senha incorreto(s), restam {4 - session['tentativas_erro']} tentativa(s)", 'warning')
+            else:
+                flash(f"Login e/ou Senha incorreto(s)", 'warning')
 
     
     return render_template("login.html")
